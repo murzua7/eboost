@@ -1,0 +1,33 @@
+[project]
+name = "eboost"
+version = "0.0.1"
+description = "Annealed, finalized, law-tuned gradient boosting inside XGBoost (working name)"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "xgboost>=3.0",
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "scikit-learn>=1.5",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+data = ["openml>=0.15"]
+
+[dependency-groups]
+dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eboost"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.ruff]
+line-length = 100

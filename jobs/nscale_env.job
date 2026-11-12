@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --job-name=matzua-eboost-env
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+# Build the eboost environment from a hashed requirements file, then check
+# that XGBoost sees the card. Usage: sbatch nscale_env.job <requirements.txt> <sha256>
+set -euo pipefail
+REQ=${1:?requirements}; WANT=${2:?sha256}
+GOT=$(sha256sum "$REQ" | cut -c1-64)
+[ "$GOT" = "$WANT" ] || { echo "REQ_REFUSED: sha256 $GOT, expected $WANT"; exit 2; }
+ENV=$HOME/envs/eboost-py312
+$HOME/.local/bin/uv venv --python 3.12 "$ENV"
+$HOME/.local/bin/uv pip install --python "$ENV/bin/python" --require-hashes -r "$REQ"
+"$ENV/bin/python" - <<'EOF'
+import numpy as np, xgboost as xgb
+X = np.random.default_rng(0).normal(size=(2000, 10)); y = (X[:, 0] > 0).astype(float)
+b = xgb.train({"objective": "binary:logistic", "device": "cuda", "tree_method": "hist"}, xgb.DMatrix(X, label=y), 20)
+print("xgboost", xgb.__version__, "cuda ok, train logloss", float(b.eval(xgb.DMatrix(X, label=y)).split(":")[1]))
+EOF

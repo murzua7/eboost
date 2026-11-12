@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=matzua-eboost-s1a
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=24
+#SBATCH --time=12:00:00
+#SBATCH --output=%x-%j.out
+# Stage 1a pilot on F (development data only). One card, WORKERS processes at
+# once, each running scripts/stage1a.py for one "task seed" line of ITEMS.
+# Usage: sbatch nscale_stage1a.job <bundle.tar.gz> <sha256> <commit> <data dir> <items file> <out dir>
+set -uo pipefail
+umask 027
+TAR=${1:?bundle}; WANT=${2:?sha256}; COMMIT=${3:?commit}; DATA=${4:?data}; ITEMS=${5:?items}; OUT=${6:?out}
+WORKERS=6; THREADS=4
+GOT=$(sha256sum "$TAR" | cut -c1-64)
+[ "$GOT" = "$WANT" ] || { echo "BUNDLE_REFUSED: sha256 $GOT, expected $WANT"; exit 2; }
+PY=$HOME/envs/eboost-py312/bin/python
+[ -x "$PY" ] || { echo "ENV_MISSING $PY"; exit 2; }
+[ -f "$DATA/MANIFEST.json" ] || { echo "DATA_MISSING $DATA"; exit 2; }
+W=$(mktemp -d "${TMPDIR:-/tmp}/eboost-$SLURM_JOB_ID-XXXX")
+trap 'rm -rf "$W"' EXIT
+tar xzf "$TAR" -C "$W" || exit 2
+mkdir -p "$OUT/logs"
+export PYTHONPATH=$W/src EBOOST_COMMIT=$COMMIT PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=$THREADS
+export PY W DATA OUT THREADS
+echo "start $(date -u +%FT%TZ) host $(hostname) commit $COMMIT items $(wc -l < "$ITEMS") gpu $CUDA_VISIBLE_DEVICES"
+one() {
+  set -- $1; t0=$(date +%s)
+  "$PY" "$W/scripts/stage1a.py" --data "$DATA" --task "$1" --seed "$2" --out "$OUT" \
+    --device cuda --nthread "$THREADS" > "$OUT/logs/task$1_seed$2.log" 2>&1
+  echo "ITEM task $1 seed $2 exit $? seconds $(( $(date +%s) - t0 ))"
+}
+export -f one
+xargs -P "$WORKERS" -I{} bash -c 'one "{}"' < "$ITEMS"
+echo "end $(date -u +%FT%TZ)"

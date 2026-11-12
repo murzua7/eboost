@@ -31,6 +31,8 @@ def data_hash(*arrays: np.ndarray) -> str:
 
 
 def git_state(repo: Path | None = None) -> dict[str, Any]:
+    if os.environ.get("EBOOST_COMMIT"):  # code shipped as a bundle, no .git
+        return {"commit": os.environ["EBOOST_COMMIT"], "dirty": False, "from": "bundle"}
     repo = repo or Path(__file__).resolve().parents[2]
     try:
         commit = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],

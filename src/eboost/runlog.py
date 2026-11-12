@@ -39,8 +39,9 @@ def git_state(repo: Path | None = None) -> dict[str, Any]:
                                 capture_output=True, text=True, check=True).stdout.strip()
         dirty = bool(subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
                                     capture_output=True, text=True, check=True).stdout.strip())
-    except subprocess.CalledProcessError:
-        commit, dirty = "none", True
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("no git commit for this run: run from a checkout or set "
+                           "EBOOST_COMMIT to the bundle's commit") from e
     return {"commit": commit, "dirty": dirty}
 
 

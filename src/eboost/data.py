@@ -95,7 +95,7 @@ def save(d: Dataset, root: Path) -> dict:
     path = root / f"task{d.task_id}.npz"
     np.savez_compressed(path, X=d.X, y=d.y)
     meta = {"name": d.name, "task_id": d.task_id, "did": d.did, "kind": d.kind,
-            "num_class": d.num_class, "cat_share": d.cat_share, "n": int(len(d.y)),
+            "num_class": d.num_class, "cat_share": d.cat_share, "n": len(d.y),
             "p": int(d.X.shape[1]), "file": path.name,
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
     (root / f"task{d.task_id}.json").write_text(json.dumps(meta, indent=1))

@@ -62,12 +62,12 @@ def split(n: int, seed: int, test_frac: float = 0.2, val_frac: float = 0.2,
     def cut(idx, frac):
         if strata is None:
             perm = rng.permutation(idx)
-            k = int(round(frac * len(idx)))
+            k = round(frac * len(idx))
             return np.sort(perm[k:]), np.sort(perm[:k])
         keep, hold = [], []
         for c in np.unique(strata[idx]):
             members = rng.permutation(idx[strata[idx] == c])
-            k = int(round(frac * len(members)))
+            k = round(frac * len(members))
             hold.append(members[:k])
             keep.append(members[k:])
         return np.sort(np.concatenate(keep)), np.sort(np.concatenate(hold))

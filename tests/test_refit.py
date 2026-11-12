@@ -105,3 +105,34 @@ def test_huge_penalty_shrinks_leaves_to_zero():
     design = refit.leaf_design(bst, d)
     w = refit.full_refit(design, y, "logistic", lam=1e9)
     assert np.max(np.abs(w)) < 1e-6
+
+
+def _cuda_or_skip():
+    try:
+        xgb.train({"device": "cuda", "tree_method": "hist"},
+                  xgb.DMatrix(np.zeros((4, 1)), label=np.zeros(4)), 1)
+    except xgb.core.XGBoostError:
+        pytest.skip("no CUDA device")
+
+
+def test_leaf_design_is_right_for_a_gpu_model_with_missing_values():
+    """XGBoost 3.4.1's GPU pred_leaf returns the wrong leaf for some rows with
+    missing values (found on adult in the Stage 1a pilot). leaf_design must
+    build its design from a traversal whose leaves add up to the margin."""
+    _cuda_or_skip()
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(2000, 6))
+    X[:, :3] = np.round(X[:, :3] * 2)
+    X[rng.random(size=X.shape) < 0.3] = np.nan
+    y = (np.nan_to_num(X[:, 0]) + np.nan_to_num(X[:, 3]) + rng.normal(size=2000) > 0).astype(float)
+    d = xgb.DMatrix(X, label=y)
+    bst = xgb.train({"objective": "binary:logistic", "device": "cuda", "max_depth": 5,
+                     "eta": 0.1, "seed": 0, "reg_alpha": 1.0}, d, 100)
+    gpu_leaf = bst.predict(d, pred_leaf=True)
+    cpu = bst.copy()
+    cpu.set_param({"device": "cpu"})
+    assert (gpu_leaf != cpu.predict(d, pred_leaf=True)).any(), "the bug this guards no longer shows"
+    design = refit.leaf_design(bst, d)
+    again = refit.write_back(bst, design, design.w0)
+    np.testing.assert_allclose(again.predict(d, output_margin=True),
+                               bst.predict(d, output_margin=True), rtol=0, atol=1e-5)

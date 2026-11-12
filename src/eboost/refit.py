@@ -48,7 +48,19 @@ def loss_kind(bst: xgb.Booster) -> str:
     return LOSSES[name]
 
 
+def _on_cpu(bst: xgb.Booster) -> xgb.Booster:
+    """A copy that predicts on the processor. XGBoost 3.4.1's GPU leaf lookup
+    (pred_leaf on device cuda) returns the wrong leaf for some rows with
+    missing values, while its GPU margin is right (adult, 5 of 39,074 rows;
+    tests/test_refit.py reproduces it). The processor's traversal is the one
+    whose leaf lookup and margin agree, so the design is built from it."""
+    cpu = bst.copy()
+    cpu.set_param({"device": "cpu"})
+    return cpu
+
+
 def leaf_design(bst: xgb.Booster, dmat: xgb.DMatrix) -> LeafDesign:
+    bst = _on_cpu(bst)
     model = json.loads(bst.save_raw("json"))["learner"]["gradient_booster"]["model"]
     trees, tree_class = model["trees"], np.asarray(model["tree_info"])
     n_class = int(tree_class.max()) + 1

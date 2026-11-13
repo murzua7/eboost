@@ -9,7 +9,7 @@ stopped there on 2026-11-12.
 - Results: [docs/progress/2026-11-12-stage1a-pilot.md](docs/progress/2026-11-12-stage1a-pilot.md)
 - Write-up: link to follow
 
-## What is here
+## Contents
 
 - `src/eboost/schedule.py`: cosine step size, set before each round
 - `src/eboost/refit.py`: joint refit of all leaf values with the tree shapes held fixed
